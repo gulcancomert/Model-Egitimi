@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+data/train/
+data/val/
+data/test/
+outputs_deit/
+*.pt
+*.pth
+.vscode/

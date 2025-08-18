@@ -34,7 +34,6 @@ class ModelBundle:
         # 4) yükle ve kontrol et
         res = model.load_state_dict(state, strict=False)
         head_out = getattr(getattr(model, "head", None), "out_features", None)
-        print(f"[DEBUG] head_out={head_out}  num_classes={num_classes}")
         if head_out != num_classes:
             raise RuntimeError(f"Head out_features {head_out} != num_classes {num_classes}")
 

@@ -1,20 +1,21 @@
-import os, json, csv, math
+import os,csv
 from typing import List
 import numpy as np
 from PIL import Image
-from io import BytesIO
+from PySide6.QtCore import Qt
 
-from PySide6.QtCore import Qt, QSize, Signal
+os.environ["TORCHDYNAMO_DISABLE"] = "1"
+
+
 from PySide6.QtGui import QPixmap, QImage, QAction
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QLabel, QPushButton,
-    QHBoxLayout, QVBoxLayout, QProgressBar, QGroupBox, QListWidget, QListWidgetItem,
-    QSplitter, QScrollArea, QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView,
+    QHBoxLayout, QVBoxLayout, QProgressBar, QGroupBox, QListWidget,
+    QSplitter,QMessageBox, QTableWidget, QTableWidgetItem,
     QCheckBox, QFormLayout, QSpinBox, QComboBox, QLineEdit, QDialog, QDialogButtonBox,
-    QStatusBar, QToolBar
+    QStatusBar,QDoubleSpinBox, QToolBar
 )
 
-import torch
 
 try:
     import qdarktheme
@@ -24,7 +25,6 @@ except Exception:
 
 from core.model_loader import ModelBundle
 from core.inference_worker import ImageInferenceWorker
-from core.preprocess import build_infer_transform
 
 from utils.logger import UILogger
 
@@ -54,6 +54,14 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Ayarlar")
         self.config = config or {}
         form = QFormLayout(self)
+        
+        
+        self.temp_spin = QDoubleSpinBox()
+        self.temp_spin.setRange(0.10, 3.00)
+        self.temp_spin.setSingleStep(0.05)
+        self.temp_spin.setDecimals(2)
+        self.temp_spin.setValue(self.config.get("temperature", 0.7))
+
 
         self.device_box = QComboBox()
         self.device_box.addItems(["auto", "cpu", "cuda"])
@@ -80,6 +88,7 @@ class SettingsDialog(QDialog):
         form.addRow("Sınıf dosyası", self.class_path)
         form.addRow(self.normalize_chk)
         form.addRow(self.gradcam_chk)
+        form.addRow("Sıcaklık (T)", self.temp_spin)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self.accept)
@@ -95,6 +104,7 @@ class SettingsDialog(QDialog):
             "classes_path": self.class_path.text().strip(),
             "normalize": self.normalize_chk.isChecked(),
             "use_attention": self.gradcam_chk.isChecked(),
+            "temperature": float(self.temp_spin.value()),
         }
 
 class ImagePreview(QLabel):
@@ -161,7 +171,8 @@ class MainWindow(QMainWindow):
             "use_attention": False,
             "model_name": "deit_small_patch16_224",
             "model_path": "outputs_deit/best.pt",
-            "classes_path": "app/data/classes.json"
+            "classes_path": "app/data/classes.json",
+            "temperature": 0.7 # <-- EKLENDİ
         }
 
         # Toolbar
@@ -229,6 +240,11 @@ class MainWindow(QMainWindow):
             g_lay.addWidget(row)
             self.rows.append((lbl, bar, val))
         right_lay.addWidget(self.top5_group)
+        
+        # --- GÜVEN ETİKETİ + MARGIN (YENİ) ---
+        self.conf_label = QLabel("Güven seviyesi: -")
+        self.conf_label.setStyleSheet("font-weight: bold;")
+        right_lay.addWidget(self.conf_label)
 
         # Meta table
         self.meta = QTableWidget(3, 2)
@@ -295,7 +311,9 @@ class MainWindow(QMainWindow):
     def load_image_path(self, path: str):
         self.current_image_path = path
         img = Image.open(path).convert("RGB")
-        qimg = QImage(img.tobytes(), img.size[0], img.size[1], QImage.Format.Format_RGB888)
+        w, h = img.size
+        buf = img.tobytes()  # tightly packed
+        qimg = QImage(buf, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
         pix = QPixmap.fromImage(qimg)
         self.preview.set_image(pix)
         self.meta.setItem(0,1, QTableWidgetItem(f"{img.size[0]}x{img.size[1]}"))
@@ -327,12 +345,19 @@ class MainWindow(QMainWindow):
             w = csv.writer(f)
             w.writerow(["file","top1_class","top1_prob","latency_ms"] + [f"top{i}_class" for i in range(2,6)] + [f"top{i}_prob" for i in range(2,6)])
             for r in self.batch_results:
-                top_idx = r.topk_idx
-                top_prob = r.topk_prob
+                top_idx = list(r.topk_idx)
+                top_prob = list(r.topk_prob)
                 names = [self.bundle.classes[i] for i in top_idx]
+
+                # 5’e tamamla
+                while len(names) < 5:
+                    names.append("-")
+                while len(top_prob) < 5:
+                    top_prob.append(0.0)
+
                 row = [r.path, names[0], f"{top_prob[0]:.4f}", f"{r.latency_ms:.2f}"]
-                # rest
-                row += names[1:] + [f"{p:.4f}" for p in top_prob[1:]]
+                row += names[1:5] + [f"{p:.4f}" for p in top_prob[1:5]]
+
                 w.writerow(row)
         self._append_log(f"CSV kaydedildi: {path}")
         QMessageBox.information(self, "CSV", "CSV başarıyla kaydedildi.")
@@ -370,7 +395,8 @@ class MainWindow(QMainWindow):
                                            image_size=cfg["image_size"],
                                            normalize=cfg["normalize"],
                                            use_attention=self.chk_attention.isChecked(),
-                                           batch_paths=paths)
+                                           batch_paths=paths,
+                                          temperature=cfg["temperature"])
         self.worker.result_ready.connect(self._on_result)
         self.worker.batch_done.connect(self._on_batch_done)
         self.worker.error.connect(self._on_error)
@@ -391,15 +417,29 @@ class MainWindow(QMainWindow):
                 lbl.setText(f"{i+1}. -")
                 bar.setValue(0)
                 val.setText("%0.00")
+         
+        # Sadece yüzdelik göster
+        top1 = float(probs[0]) if len(probs) > 0 else 0.0
+        top2 = float(probs[1]) if len(probs) > 1 else 0.0
+        margin = top1 - top2
+
+        self.conf_label.setText(f"Top-1: %{top1*100:.1f}  |  Fark: {margin:.2f}")
+
         # meta
         dev = getattr(self.bundle.device, "type", str(self.bundle.device))
         self.meta.setItem(1,1, QTableWidgetItem(f"{dev} / {res.latency_ms:.2f}"))
         # attention overlay if available
-        if res.attn_map is not None and self.current_image_path and os.path.samefile(res.path, self.current_image_path):
+        if res.attn_map is not None and self.current_image_path and \
+        os.path.abspath(res.path) == os.path.abspath(self.current_image_path):
             base = Image.open(self.current_image_path).convert("RGB")
-            over = overlay_heatmap(base, res.attn_map, alpha=0.45)
-            qimg = QImage(over.tobytes(), over.size[0], over.size[1], QImage.Format.Format_RGB888)
+            heat = res.attn_map
+            # 0..1 aralığına normalleştir
+            heat = (heat - float(np.min(heat))) / (float(np.ptp(heat)) + 1e-6)
+            over = overlay_heatmap(base, heat, alpha=0.45)
+            w, h = over.size
+            qimg = QImage(over.tobytes(), w, h, 3 * w, QImage.Format.Format_RGB888).copy()
             self.preview.set_image(QPixmap.fromImage(qimg))
+
 
         self.batch_results.append(res)
 
@@ -417,6 +457,16 @@ class MainWindow(QMainWindow):
     def _append_log(self, text: str):
         self.log.addItem(text)
         self.log.scrollToBottom()
+        
+            
+    def closeEvent(self, e):
+        try:
+            if hasattr(self, "worker") and self.worker.isRunning():
+                self.worker.stop()
+                self.worker.wait(2000)  # ms
+        finally:
+            super().closeEvent(e)
+            
 
 def main():
     import sys

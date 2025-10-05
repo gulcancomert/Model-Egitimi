@@ -1,4 +1,4 @@
-# app/main1.py içindeki Backend sınıfını bununla değiştir
+
 import os, csv, tempfile, traceback
 from typing import List
 import numpy as np
@@ -85,14 +85,14 @@ class InferenceThread(QThread):
 
 class Backend(QObject):
     # QML bağları
-    imageChanged = Signal(str)        # "file:///..." url
-    resultsChanged = Signal(list)     # ["class: %", ...]
+    imageChanged = Signal(str)       
+    resultsChanged = Signal(list)     
     busyChanged = Signal(bool)
     messageChanged = Signal(str)
     progressChanged = Signal(int)
     metaChanged = Signal(str, str, str)  # size_text, device_latency, file_name
     logAdded = Signal(str)
-    infoChanged = Signal(str)   # ✅ yeni sinyal (örneğin boyut için)
+    infoChanged = Signal(str)  #yeni sinyal
 
     def __init__(self):
         super().__init__()
@@ -227,7 +227,7 @@ class Backend(QObject):
         self._append_log(f"CSV kaydedildi: {path}")
         self.messageChanged.emit("CSV başarıyla kaydedildi.")
 
-    # ---------- Internal run ----------
+
     def _run_paths(self, paths: List[str]):
         if not self._ensure_model():
             return
@@ -328,7 +328,7 @@ if __name__ == "__main__":
     if not engine.rootObjects():
         sys.exit(-1)
 
-    # 3 saniye sonra main1.qml'e geçiş yap
+  
     def load_main():
         engine.clearComponentCache()
         qml_file = os.path.join(os.path.dirname(__file__), "main1.qml")

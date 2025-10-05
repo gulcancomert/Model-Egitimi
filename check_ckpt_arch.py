@@ -1,7 +1,7 @@
-# check_ckpt_arch.py
+
 import torch, timm, json
 
-CKPT = "outputs_deit/best.pt"     # senin kullandığın yol
+CKPT = "outputs_deit/best.pt"    
 CLASSES = "app/data/classes.json"
 
 with open(CLASSES, "r", encoding="utf-8") as f:

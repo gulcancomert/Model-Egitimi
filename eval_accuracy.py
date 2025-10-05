@@ -1,4 +1,4 @@
-# eval_accuracy.py
+
 import argparse, json, os, torch, timm
 from pathlib import Path
 from torchvision.datasets import ImageFolder
@@ -21,18 +21,18 @@ def main():
 
     dev = torch.device("cuda" if (args.device in ["auto","cuda"] and torch.cuda.is_available()) else "cpu")
 
-    # 1) sınıf isimleri
+ 
     with open(args.classes_json, "r", encoding="utf-8") as f:
         cls_map = json.load(f)
     classes = [cls_map[str(i)] for i in range(len(cls_map))]
 
-    # 2) dataset & transform (val/test dönüşümü)
+ 
     tfm = create_transform(input_size=args.img_size, is_training=False, interpolation="bicubic")
     ds = ImageFolder(args.data_root, transform=tfm)
     assert ds.classes == classes, "ImageFolder sınıf sırası classes.json ile aynı olmalı!"
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=(dev.type=="cuda"))
 
-    # 3) model iskeleti + ağırlık yükle
+   
     model = timm.create_model(args.model_name, pretrained=False, num_classes=len(classes))
     state = torch.load(args.ckpt, map_location="cpu")
     if isinstance(state, dict) and "model" in state:

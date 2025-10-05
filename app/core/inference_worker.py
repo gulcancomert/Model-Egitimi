@@ -22,8 +22,8 @@ class InferenceResult:
         self.attn_map = attn_map
 
 class ImageInferenceWorker(QThread):
-    result_ready = Signal(object)    # InferenceResult
-    batch_done = Signal(list)        # list of InferenceResult
+    result_ready = Signal(object)    
+    batch_done = Signal(list)        
     error = Signal(str)
     progress = Signal(int)
 
@@ -50,7 +50,7 @@ class ImageInferenceWorker(QThread):
                 self.error.emit("Görüntü yolu listesi boş (batch_paths).")
                 return
 
-            device = self.bundle.device          # torch.device('cuda') / 'cpu' / 'mps'
+            device = self.bundle.device       
             model  = self.bundle.model
             classes = self.bundle.classes
 
@@ -111,7 +111,7 @@ class ImageInferenceWorker(QThread):
                 # 6) (İsteğe bağlı) Attention heatmap
                 attn_map = None
                 if rollout:
-                    mask = rollout()                   # [L, L] ya da benzeri
+                    mask = rollout()                  ü
                     P = mask.shape[-1]
                     g = int(P ** 0.5)
                     maps = attention_to_map(mask, g, (h, w))
@@ -124,7 +124,6 @@ class ImageInferenceWorker(QThread):
                 self.result_ready.emit(res)
                 self.progress.emit(int(100 * (idx + 1) / total))
 
-            # stop edildiyse batch_done göndermeyebilirsin
             if self._stop:
                 return
 

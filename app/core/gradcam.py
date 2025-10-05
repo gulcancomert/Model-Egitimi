@@ -17,7 +17,7 @@ class VitAttentionRollout:
             self.hooks.append(h)
 
     def _hook(self, module, input, output):
-        # input[0] is attention after softmax, before dropout; shape (B, heads, tokens, tokens)
+      
         if len(input) > 0:
             self.attentions.append(input[0].detach().cpu())
 

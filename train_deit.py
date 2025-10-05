@@ -20,7 +20,7 @@ from torch import amp
 # =======================
 # AYARLAR
 # =======================
-# Bu dosyanın yanındaki "data" klasörünü kullan (içinde train/val/test olmalı)
+
 DATA_ROOT = str(Path(__file__).parent / "data")
 
 MODEL_NAME = "deit_small_patch16_224"
@@ -59,9 +59,9 @@ missing = [d for d in ["train", "val", "test"] if not (p / d).exists()]
 if missing:
     raise SystemExit(f"Şu klasör(ler) eksik: {missing}. DATA_ROOT içinde train/val/test olmalı!")
 
-# =======================
-# Dönüşümler (augment)
-# =======================
+
+# Dönüşümler 
+
 train_tfms = create_transform(
     input_size=IMG_SIZE,
     is_training=True,
@@ -92,9 +92,9 @@ train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_wo
 val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, pin_memory=pin_mem)
 test_loader  = DataLoader(test_ds,  batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, pin_memory=pin_mem)
 
-# =======================
+
 # Model, optimizer, scheduler, loss
-# =======================
+
 model = timm.create_model(MODEL_NAME, pretrained=True, num_classes=num_classes).to(device)
 
 optimizer = create_optimizer_v2(model, opt="adamw", lr=LR, weight_decay=WEIGHT_DECAY, betas=(0.9, 0.999))
@@ -126,9 +126,9 @@ val_criterion = LabelSmoothingCrossEntropy(smoothing=LABEL_SMOOTHING)  # val/tes
 
 ema = ModelEmaV2(model, decay=EMA_DECAY) if USE_EMA else None
 
-# =======================
+
 # Fonksiyonlar
-# =======================
+
 def train_one_epoch(epoch: int):
     model.train()
     running_loss, n = 0.0, 0
@@ -197,9 +197,9 @@ def evaluate(loader, use_ema=True):
     f1  = f1_score(y_true, y_pred, average="macro")
     return avg_loss, acc, f1
 
-# =======================
+
 # Eğitim döngüsü + Early Stopping
-# =======================
+
 best_val_loss = float("inf")
 best_state = None
 best_epoch = -1
@@ -236,9 +236,9 @@ for epoch in range(EPOCHS):
         print(f"Early stopping! {EARLY_STOP_PATIENCE} epoch iyileşme yok.")
         break
 
-# =======================
+
 # En iyi modeli yükle ve test et
-# =======================
+
 ckpt_path = os.path.join(OUTPUT_DIR, "best.pt")
 if os.path.exists(ckpt_path):
     ckpt = torch.load(ckpt_path, map_location=device)

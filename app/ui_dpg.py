@@ -1,7 +1,7 @@
-# app/ui_dpg.py  — Dear PyGui arayüzü (mevcut ui_main.py'ye dokunmadan)
+
 
 import os
-os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")  # bazı Torch-Dynamo yan etkilerini kapat
+os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")  
 
 import threading
 from pathlib import Path
@@ -27,7 +27,7 @@ STATE = {
     "texture_w": 1,
     "texture_h": 1,
     "temperature": 0.7,
-    "use_attention": False,   # ileride Grad-CAM bağlamak istersen
+    "use_attention": False,   
     "busy": False,
 }
 
@@ -37,9 +37,9 @@ TEX_REG_ID = None
 MAIN_DRAWLIST_ID = None
 MAIN_IMAGE_NODE_ID = None
 
-# ======================
-#   MODELİ TEK SEFER YÜKLE
-# ======================
+
+#MODELİ TEK SEFER YÜKLE
+
 ROOT = Path(__file__).resolve().parents[1]  # repo kökü
 MODEL_PATH = ROOT / "outputs_deit" / "best.pt"
 CLASSES_PATH = ROOT / "app" / "data" / "classes.json"
@@ -173,9 +173,9 @@ def run_inference_threaded():
     threading.Thread(target=_job, daemon=True).start()
 
 
-# ======================
-#   UI OLUŞTUR
-# ======================
+
+#Uİ oluşturuyorum
+
 dpg.create_context()
 dpg.create_viewport(title="Zoo Classifier (Dear PyGui)", width=1200, height=820)
 
